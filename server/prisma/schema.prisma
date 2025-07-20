@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  avatar        String?
+  passwordHash  String
+  organizationId String?
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+  hostedMeetings Meeting[]    @relation("MeetingHost")
+  participations Participant[]
+  chatMessages  ChatMessage[]
+  userSessions  UserSession[]
+  auditLogs     AuditLog[]
+
+  // User preferences (JSON field)
+  preferences   Json?
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users     User[]
+  meetings  Meeting[]
+
+  // Organization settings (JSON field)
+  settings  Json?
+
+  @@map("organizations")
+}
+
+model Meeting {
+  id             String        @id @default(cuid())
+  title          String
+  description    String?
+  hostId         String
+  organizationId String?
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  duration       Int?          // in minutes
+  status         MeetingStatus @default(SCHEDULED)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  host           User          @relation("MeetingHost", fields: [hostId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  participants   Participant[]
+  recordings     Recording[]
+  chatMessages   ChatMessage[]
+
+  // Meeting settings (JSON field)
+  settings       Json?
+
+  @@map("meetings")
+}
+
+model Participant {
+  id              String    @id @default(cuid())
+  userId          String
+  meetingId       String
+  role            ParticipantRole @default(PARTICIPANT)
+  joinedAt        DateTime  @default(now())
+  leftAt          DateTime?
+  isAudioMuted    Boolean   @default(false)
+  isVideoMuted    Boolean   @default(false)
+  isScreenSharing Boolean   @default(false)
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id])
+  meeting         Meeting   @relation(fields: [meetingId], references: [id])
+
+  @@unique([userId, meetingId])
+  @@map("participants")
+}
+
+model Recording {
+  id          String          @id @default(cuid())
+  meetingId   String
+  fileName    String
+  filePath    String
+  fileSize    BigInt
+  duration    Int             // in seconds
+  status      RecordingStatus @default(PROCESSING)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  meeting     Meeting         @relation(fields: [meetingId], references: [id])
+
+  @@map("recordings")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  meetingId String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  // Relations
+  meeting   Meeting  @relation(fields: [meetingId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum ParticipantRole {
+  HOST
+  MODERATOR
+  PARTICIPANT
+}
+
+enum RecordingStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
