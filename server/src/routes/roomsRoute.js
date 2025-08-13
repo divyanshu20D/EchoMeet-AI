@@ -1,7 +1,7 @@
-const express = require('express');
-const roomController = require('../controllers/roomController');
-const { z } = require('zod');
-const { validateBody, validateParams } = require('../middleware/validation');
+import express from 'express';
+import roomController from '../controllers/roomController.js';
+import { z } from 'zod';
+import { validateBody, validateParams } from '../middleware/validation.js';
 
 const router = express.Router();
 
@@ -25,4 +25,4 @@ router.get('/:roomId', validateParams(roomIdSchema), roomController.getRoomById)
 // Get room participants
 router.get('/:roomId/participants', validateParams(roomIdSchema), roomController.getRoomParticipants);
 
-module.exports = router;
+export default router;

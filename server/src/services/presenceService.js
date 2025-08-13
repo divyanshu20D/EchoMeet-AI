@@ -1,5 +1,5 @@
-const cacheService = require('./cacheService');
-const { getRedisPublisher, getRedisSubscriber } = require('../utils/redis');
+import cacheService from './cacheService.js';
+import { getRedisPublisher, getRedisSubscriber } from '../utils/redis.js';
 
 class PresenceService {
     constructor() {
@@ -370,4 +370,4 @@ class PresenceService {
     }
 }
 
-module.exports = new PresenceService();
+export default new PresenceService();

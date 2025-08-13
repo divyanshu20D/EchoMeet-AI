@@ -1,9 +1,9 @@
-const express = require('express');
-const meetingController = require('../controllers/meetingController');
-const { authenticateToken, optionalAuth } = require('../middleware/auth');
-const { validateBody, validateParams, validatePagination } = require('../middleware/validation');
-const { meetingCreationSchema, meetingUpdateSchema } = require('../schemas/meeting');
-const { z } = require('zod');
+import express from 'express';
+import meetingController from '../controllers/meetingController.js';
+import { authenticateToken, optionalAuth } from '../middleware/auth.js';
+import { validateBody, validateParams, validatePagination } from '../middleware/validation.js';
+import { meetingCreationSchema, meetingUpdateSchema } from '../schemas/meeting.model.js';
+import { z } from 'zod';
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ const meetingIdSchema = z.object({
 router.post('/', authenticateToken, validateBody(meetingCreationSchema), meetingController.createMeeting);
 
 // Get user's meetings
-router.get('/', authenticateToken, validatePagination, meetingController.getUserMeetings);
+router.get('/', authenticateToken, meetingController.getUserMeetings);
 
 // Get meeting by ID
 router.get('/:meetingId', optionalAuth, validateParams(meetingIdSchema), meetingController.getMeetingById);
@@ -33,4 +33,19 @@ router.post('/:meetingId/start', authenticateToken, validateParams(meetingIdSche
 // End meeting
 router.post('/:meetingId/end', authenticateToken, validateParams(meetingIdSchema), meetingController.endMeeting);
 
-module.exports = router;
+// Get meeting info for joining (public endpoint)
+router.get('/:meetingId/info', validateParams(meetingIdSchema), meetingController.getMeetingInfo);
+
+// Validate meeting access
+router.post('/validate-access', meetingController.validateMeetingAccess);
+
+// Join meeting
+router.post('/:meetingId/join', authenticateToken, validateParams(meetingIdSchema), meetingController.joinMeeting);
+
+// Leave meeting
+router.post('/:meetingId/leave', authenticateToken, validateParams(meetingIdSchema), meetingController.leaveMeeting);
+
+// Get meeting participants
+router.get('/:meetingId/participants', authenticateToken, validateParams(meetingIdSchema), meetingController.getMeetingParticipants);
+
+export default router;

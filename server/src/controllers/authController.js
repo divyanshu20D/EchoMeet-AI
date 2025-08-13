@@ -1,4 +1,4 @@
-const authService = require('../services/authService');
+import authService from '../services/authService.js';
 
 class AuthController {
     async register(req, res) {
@@ -8,7 +8,9 @@ class AuthController {
             res.status(201).json({
                 message: 'User registered successfully',
                 user: result.user,
-                tokens: result.tokens
+                accessToken: result.tokens.accessToken,
+                refreshToken: result.tokens.refreshToken,
+                expiresIn: result.tokens.expiresIn
             });
         } catch (error) {
             console.error('Registration error:', error);
@@ -51,7 +53,9 @@ class AuthController {
             res.json({
                 message: 'Login successful',
                 user: result.user,
-                tokens: result.tokens
+                accessToken: result.tokens.accessToken,
+                refreshToken: result.tokens.refreshToken,
+                expiresIn: result.tokens.expiresIn
             });
         } catch (error) {
             console.error('Login error:', error);
@@ -169,6 +173,26 @@ class AuthController {
             });
         }
     }
-}
 
-module.exports = new AuthController();
+    async getMFAStatus(req, res) {
+        try {
+            // For now, return a simple MFA status
+            // In a real app, you'd check the user's MFA settings from the database
+            res.json({
+                isEnabled: false,
+                isRequired: false,
+                backupCodesCount: 0
+            });
+        } catch (error) {
+            console.error('Get MFA status error:', error);
+            res.status(500).json({
+                error: {
+                    code: 'MFA_STATUS_FAILED',
+                    message: 'Failed to get MFA status',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
+}
+export default new AuthController();

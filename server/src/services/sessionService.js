@@ -1,5 +1,5 @@
-const cacheService = require('./cacheService');
-const { getPrismaClient } = require('../utils/database');
+import cacheService from './cacheService.js';
+import { getPrismaClient } from '../utils/database.js';
 
 class SessionService {
     constructor() {
@@ -302,4 +302,4 @@ class SessionService {
     }
 }
 
-module.exports = new SessionService();
+export default new SessionService();

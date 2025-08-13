@@ -1,8 +1,8 @@
-const express = require('express');
-const authController = require('../controllers/authController');
-const { validateBody } = require('../middleware/validation');
-const { authenticateToken } = require('../middleware/auth');
-const { userRegistrationSchema, userLoginSchema, passwordChangeSchema } = require('../schemas/user.model');
+import express from 'express';
+import authController from '../controllers/authController.js';
+import { validateBody } from '../middleware/validation.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { userRegistrationSchema, userLoginSchema, passwordChangeSchema } from '../schemas/user.model.js';
 
 const router = express.Router();
 
@@ -24,4 +24,7 @@ router.post('/change-password', authenticateToken, validateBody(passwordChangeSc
 // Get current user profile
 router.get('/me', authenticateToken, authController.getProfile);
 
-module.exports = router;
+// MFA status endpoint
+router.get('/mfa/status', authenticateToken, authController.getMFAStatus);
+
+export default router;

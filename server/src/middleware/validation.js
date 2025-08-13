@@ -1,4 +1,4 @@
-const { z } = require('zod');
+import { z } from 'zod';
 
 // Generic validation middleware factory
 function validateSchema(schema, source = 'body') {
@@ -71,8 +71,8 @@ const commonSchemas = {
 
     // Pagination query validation
     pagination: z.object({
-        page: z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().min(1)).default('1'),
-        limit: z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().min(1).max(100)).default('10'),
+        page: z.coerce.number().int().min(1).default(1),
+        limit: z.coerce.number().int().min(1).max(100).default(10),
         sortBy: z.string().optional(),
         sortOrder: z.enum(['asc', 'desc']).default('desc')
     }),
@@ -95,7 +95,7 @@ const validateUuidParam = validateParams(commonSchemas.uuidParam);
 const validatePagination = validateQuery(commonSchemas.pagination);
 const validateSearch = validateQuery(commonSchemas.search);
 
-module.exports = {
+export {
     validateSchema,
     validateBody,
     validateQuery,

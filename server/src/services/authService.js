@@ -1,17 +1,24 @@
-const { getPrismaClient } = require('../utils/database');
-const { hashPassword, verifyPassword, generateTokenPair, verifyRefreshToken, invalidateUserSession } = require('../utils/auth');
-const sessionService = require('./sessionService');
+import { getPrismaClient } from '../utils/database.js';
+import { hashPassword, verifyPassword, generateTokenPair, verifyRefreshToken, invalidateUserSession } from '../utils/auth.js';
+import sessionService from './sessionService.js';
 
 class AuthService {
     constructor() {
-        this.prisma = getPrismaClient();
+        this.prisma = null;
+    }
+
+    getPrisma() {
+        if (!this.prisma) {
+            this.prisma = getPrismaClient();
+        }
+        return this.prisma;
     }
 
     async registerUser(userData) {
-        const { email, name, password, organizationId } = userData;
+        const { email, name, password, organizationId, organizationName } = userData;
 
         // Check if user already exists
-        const existingUser = await this.prisma.user.findUnique({
+        const existingUser = await this.getPrisma().user.findUnique({
             where: { email }
         });
 
@@ -19,9 +26,37 @@ class AuthService {
             throw new Error('USER_EXISTS');
         }
 
-        // Validate organization if provided
-        if (organizationId) {
-            const organization = await this.prisma.organization.findUnique({
+        let finalOrganizationId = organizationId;
+
+        // Handle organization creation or validation
+        if (organizationName && !organizationId) {
+            // Create a domain from organization name (simple approach)
+            const domain = organizationName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.local';
+
+            // Check if organization with this name already exists
+            let organization = await this.getPrisma().organization.findFirst({
+                where: { name: organizationName }
+            });
+
+            if (!organization) {
+                // Create new organization
+                organization = await this.getPrisma().organization.create({
+                    data: {
+                        name: organizationName,
+                        domain: domain,
+                        settings: {
+                            allowPublicMeetings: true,
+                            maxMeetingDuration: 240, // 4 hours
+                            recordingEnabled: true
+                        }
+                    }
+                });
+            }
+
+            finalOrganizationId = organization.id;
+        } else if (organizationId) {
+            // Validate existing organization ID
+            const organization = await this.getPrisma().organization.findUnique({
                 where: { id: organizationId }
             });
 
@@ -34,12 +69,12 @@ class AuthService {
         const passwordHash = await hashPassword(password);
 
         // Create user
-        const user = await this.prisma.user.create({
+        const user = await this.getPrisma().user.create({
             data: {
                 email,
                 name,
                 passwordHash,
-                organizationId,
+                organizationId: finalOrganizationId,
                 preferences: {
                     defaultAudioMuted: false,
                     defaultVideoMuted: false,
@@ -70,7 +105,7 @@ class AuthService {
 
     async loginUser(email, password) {
         // Find user
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma().user.findUnique({
             where: { email }
         });
 
@@ -86,7 +121,7 @@ class AuthService {
         }
 
         // Update last login
-        await this.prisma.user.update({
+        await this.getPrisma().user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() }
         });
@@ -116,7 +151,7 @@ class AuthService {
         }
 
         // Verify user is still active in database
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma().user.findUnique({
             where: { id: session.userId },
             select: {
                 id: true,
@@ -147,7 +182,7 @@ class AuthService {
         await sessionService.invalidateUserSessions(userId);
 
         // Also invalidate database sessions for backup
-        await this.prisma.userSession.updateMany({
+        await this.getPrisma().userSession.updateMany({
             where: { userId },
             data: { isActive: false }
         });
@@ -155,7 +190,7 @@ class AuthService {
 
     async changePassword(userId, currentPassword, newPassword) {
         // Get user with password
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma().user.findUnique({
             where: { id: userId }
         });
 
@@ -170,20 +205,20 @@ class AuthService {
         const newPasswordHash = await hashPassword(newPassword);
 
         // Update password
-        await this.prisma.user.update({
+        await this.getPrisma().user.update({
             where: { id: userId },
             data: { passwordHash: newPasswordHash }
         });
 
         // Invalidate all sessions to force re-login
-        await this.prisma.userSession.updateMany({
+        await this.getPrisma().userSession.updateMany({
             where: { userId },
             data: { isActive: false }
         });
     }
 
     async getUserProfile(userId) {
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma().user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
@@ -209,4 +244,4 @@ class AuthService {
     }
 }
 
-module.exports = new AuthService();
+export default new AuthService();

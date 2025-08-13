@@ -1,5 +1,6 @@
-const { verifyToken, getUserSession } = require('../utils/auth');
-const { getPrismaClient } = require('../utils/database');
+import { verifyToken, getUserSession } from '../utils/auth.js';
+import { getPrismaClient } from '../utils/database.js';
+import sessionCacheService from '../services/sessionCacheService.js';
 
 // Authentication middleware
 async function authenticateToken(req, res, next) {
@@ -20,19 +21,51 @@ async function authenticateToken(req, res, next) {
         // Verify token
         const decoded = verifyToken(token);
 
-        // Get user from database to ensure they still exist and are active
-        const prisma = getPrismaClient();
-        const user = await prisma.user.findUnique({
-            where: { id: decoded.userId },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-                organizationId: true,
+        // Try to get session from Redis cache first
+        const sessionId = `${decoded.userId}_${token.slice(-10)}`; // Create session ID from user and token
+        let sessionData = await sessionCacheService.getSession(sessionId);
+
+        let user;
+        if (sessionData) {
+            // Use cached session data
+            user = {
+                id: sessionData.userId,
+                email: sessionData.email,
+                name: sessionData.name,
+                role: sessionData.role,
+                organizationId: sessionData.organizationId,
                 isActive: true
+            };
+
+            // Update session activity
+            await sessionCacheService.extendSession(sessionId);
+        } else {
+            // Fallback to database lookup
+            const prisma = getPrismaClient();
+            user = await prisma.user.findUnique({
+                where: { id: decoded.userId },
+                select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    role: true,
+                    organizationId: true,
+                    isActive: true
+                }
+            });
+
+            if (user && user.isActive) {
+                // Cache the session for future requests
+                await sessionCacheService.setSession(sessionId, {
+                    userId: user.id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                    organizationId: user.organizationId,
+                    token: token
+                });
             }
-        });
+        }
 
         if (!user || !user.isActive) {
             return res.status(401).json({
@@ -145,7 +178,7 @@ function requireOrganization(req, res, next) {
     next();
 }
 
-module.exports = {
+export {
     authenticateToken,
     optionalAuth,
     requireRole,

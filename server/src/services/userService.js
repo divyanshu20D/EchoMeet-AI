@@ -1,12 +1,18 @@
-const { getPrismaClient } = require('../utils/database');
-
+import { getPrismaClient } from '../utils/database.js';
 class UserService {
     constructor() {
-        this.prisma = getPrismaClient();
+        this.prisma = null;
+    }
+
+    getPrisma() {
+        if (!this.prisma) {
+            this.prisma = getPrismaClient();
+        }
+        return this.prisma;
     }
 
     async updateUserProfile(userId, updateData) {
-        const updatedUser = await this.prisma.user.update({
+        const updatedUser = await this.getPrisma.user.update({
             where: { id: userId },
             data: updateData,
             select: {
@@ -29,7 +35,7 @@ class UserService {
         const skip = (page - 1) * limit;
 
         const [users, total] = await Promise.all([
-            this.prisma.user.findMany({
+            this.getPrisma.user.findMany({
                 select: {
                     id: true,
                     email: true,
@@ -53,7 +59,7 @@ class UserService {
                 skip,
                 take: limit
             }),
-            this.prisma.user.count()
+            this.getPrisma.user.count()
         ]);
 
         return {
@@ -68,7 +74,7 @@ class UserService {
     }
 
     async getUserById(userId) {
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
@@ -111,7 +117,7 @@ class UserService {
             throw new Error('CANNOT_DEACTIVATE_SELF');
         }
 
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma.user.findUnique({
             where: { id: userId }
         });
 
@@ -119,7 +125,7 @@ class UserService {
             throw new Error('USER_NOT_FOUND');
         }
 
-        const updatedUser = await this.prisma.user.update({
+        const updatedUser = await this.getPrisma.user.update({
             where: { id: userId },
             data: { isActive: false },
             select: {
@@ -131,7 +137,7 @@ class UserService {
         });
 
         // Invalidate all user sessions
-        await this.prisma.userSession.updateMany({
+        await this.getPrisma.userSession.updateMany({
             where: { userId },
             data: { isActive: false }
         });
@@ -140,7 +146,7 @@ class UserService {
     }
 
     async activateUser(userId) {
-        const user = await this.prisma.user.findUnique({
+        const user = await this.getPrisma.user.findUnique({
             where: { id: userId }
         });
 
@@ -148,7 +154,7 @@ class UserService {
             throw new Error('USER_NOT_FOUND');
         }
 
-        const updatedUser = await this.prisma.user.update({
+        const updatedUser = await this.getPrisma.user.update({
             where: { id: userId },
             data: { isActive: true },
             select: {
@@ -163,4 +169,4 @@ class UserService {
     }
 }
 
-module.exports = new UserService();
+export default new UserService();

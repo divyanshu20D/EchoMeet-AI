@@ -1,9 +1,9 @@
-const express = require('express');
-const userController = require('../controllers/userController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
-const { validateBody, validateParams, validatePagination } = require('../middleware/validation');
-const { userUpdateSchema } = require('../schemas/user.model');
-const { z } = require('zod');
+import express from 'express';
+import userController from '../controllers/userController.js';
+import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, validateParams, validatePagination } from '../middleware/validation.js';
+import { userUpdateSchema } from '../schemas/user.model.js';
+import { z } from 'zod';
 
 const router = express.Router();
 
@@ -27,4 +27,4 @@ router.post('/:userId/deactivate', authenticateToken, requireRole(['ADMIN', 'SUP
 // Activate user (admin only)
 router.post('/:userId/activate', authenticateToken, requireRole(['ADMIN', 'SUPER_ADMIN']), validateParams(userIdSchema), userController.activateUser);
 
-module.exports = router;
+export default router;

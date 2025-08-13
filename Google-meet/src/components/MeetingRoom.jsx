@@ -44,7 +44,7 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
         socket.on('participant-removed', handleParticipantRemoved)
 
         return () => {
-            // Cleanup
+            // Cleanup socket listeners
             socket.off('joined-room')
             socket.off('user-joined')
             socket.off('user-left')
@@ -57,9 +57,12 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
             socket.off('removed-from-meeting')
             socket.off('participant-removed')
 
-            // Stop local stream
+            // Stop all local stream tracks
             if (localStream) {
-                localStream.getTracks().forEach(track => track.stop())
+                localStream.getTracks().forEach(track => {
+                    track.stop()
+                    console.log(`Cleanup: Stopped ${track.kind} track`)
+                })
             }
         }
     }, [socket, roomData])
@@ -145,11 +148,33 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
     }
 
     const handleMeetingEnded = (data) => {
+        // Stop all media tracks when meeting ends
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                track.stop()
+                console.log(`Stopped ${track.kind} track on meeting end`)
+            })
+        }
+
+        // Clear local stream reference
+        setLocalStream(null)
+
         alert(data.message)
         onLeaveMeeting()
     }
 
     const handleRemovedFromMeeting = (data) => {
+        // Stop all media tracks when removed from meeting
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                track.stop()
+                console.log(`Stopped ${track.kind} track on removal`)
+            })
+        }
+
+        // Clear local stream reference
+        setLocalStream(null)
+
         alert(data.message)
         onLeaveMeeting()
     }
@@ -189,8 +214,12 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
     const toggleScreenShare = async () => {
         try {
             if (!isScreenSharing) {
+                // Request screen sharing permission
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
+                    video: {
+                        cursor: 'always',
+                        displaySurface: 'monitor'
+                    },
                     audio: true
                 })
 
@@ -220,7 +249,7 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
                 setIsScreenSharing(true)
                 socket.emit('start-screen-share')
 
-                // Handle screen share end
+                // Handle screen share end when user stops sharing
                 screenTrack.onended = () => {
                     stopScreenShare()
                 }
@@ -229,11 +258,27 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
             }
         } catch (error) {
             console.error('Error toggling screen share:', error)
+            if (error.name === 'NotAllowedError') {
+                alert('Screen sharing permission was denied. Please allow screen sharing and try again.')
+            } else if (error.name === 'NotSupportedError') {
+                alert('Screen sharing is not supported in this browser.')
+            } else {
+                alert('Failed to start screen sharing. Please try again.')
+            }
         }
     }
 
     const stopScreenShare = async () => {
         try {
+            // Stop current screen sharing tracks
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    if (track.kind === 'video') {
+                        track.stop()
+                    }
+                })
+            }
+
             // Get camera stream back
             const cameraStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
@@ -251,6 +296,7 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
             socket.emit('stop-screen-share')
         } catch (error) {
             console.error('Error stopping screen share:', error)
+            alert('Failed to stop screen sharing. Please try again.')
         }
     }
 
@@ -261,16 +307,41 @@ const MeetingRoom = ({ roomData, onLeaveMeeting }) => {
     }
 
     const leaveMeeting = () => {
+        // Stop all media tracks before leaving
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                track.stop()
+                console.log(`Stopped ${track.kind} track`)
+            })
+        }
+
+        // Emit leave room event
         if (socket) {
             socket.emit('leave-room')
         }
+
+        // Clear local stream reference
+        setLocalStream(null)
+
+        // Call parent callback
         onLeaveMeeting()
     }
 
     const endMeeting = () => {
         if (socket && roomData.isHost) {
             if (confirm('Are you sure you want to end the meeting for everyone?')) {
+                // Stop all media tracks before ending meeting
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        track.stop()
+                        console.log(`Stopped ${track.kind} track`)
+                    })
+                }
+
                 socket.emit('end-meeting')
+
+                // Clear local stream reference
+                setLocalStream(null)
             }
         }
     }

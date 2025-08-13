@@ -1,4 +1,4 @@
-const Redis = require('ioredis');
+import Redis from 'ioredis';
 
 let redisClient;
 let redisSubscriber;
@@ -149,7 +149,7 @@ process.on('SIGTERM', async () => {
     await disconnectRedis();
 });
 
-module.exports = {
+export {
     initializeRedis,
     getRedisClient,
     getRedisSubscriber,

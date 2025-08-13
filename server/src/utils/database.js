@@ -1,10 +1,17 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 
 let prisma;
 
 // Initialize Prisma client with connection pooling
 function initializePrisma() {
     if (!prisma) {
+        console.log('DATABASE_URL:', process.env.DATABASE_URL);
+        console.log('All env vars:', Object.keys(process.env).filter(key => key.includes('DATABASE')));
+
+        if (!process.env.DATABASE_URL) {
+            throw new Error('DATABASE_URL environment variable is not set');
+        }
+
         prisma = new PrismaClient({
             datasources: {
                 db: {
@@ -58,7 +65,7 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
-module.exports = {
+export {
     initializePrisma,
     getPrismaClient,
     disconnectPrisma,

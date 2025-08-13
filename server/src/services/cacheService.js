@@ -1,4 +1,4 @@
-const { getRedisClient } = require('../utils/redis');
+import { getRedisClient } from '../utils/redis.js';
 
 class CacheService {
     constructor() {
@@ -288,4 +288,4 @@ class CacheService {
     }
 }
 
-module.exports = new CacheService();
+export default new CacheService();

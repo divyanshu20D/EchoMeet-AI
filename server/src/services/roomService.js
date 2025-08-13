@@ -1,5 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
-
+import { v4 as uuidv4 } from 'uuid';
 // In-memory storage for rooms and participants (will be moved to Redis later)
 const rooms = new Map();
 const participants = new Map(); // socketId -> participant info
@@ -331,4 +330,4 @@ class RoomService {
     }
 }
 
-module.exports = new RoomService();
+export default new RoomService();

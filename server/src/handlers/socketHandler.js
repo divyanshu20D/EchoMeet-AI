@@ -1,30 +1,133 @@
 const roomService = require('../services/roomService');
 
+const sessionCacheService = require('../services/sessionCacheService');
+const meetingCacheService = require('../services/meetingCacheService');
+const { getRedisPublisher, getRedisSubscriber } = require('../utils/redis');
+
 class SocketHandler {
     constructor(io) {
         this.io = io;
+        this.publisher = getRedisPublisher();
+        this.subscriber = getRedisSubscriber();
+        this.setupRedisSubscriptions();
+    }
+
+    // Setup Redis pub/sub for cross-server communication
+    setupRedisSubscriptions() {
+        const channels = [
+            'socket:user_joined',
+            'socket:user_left',
+            'socket:message_broadcast',
+            'socket:meeting_update'
+        ];
+
+        channels.forEach(channel => {
+            this.subscriber.subscribe(channel);
+        });
+
+        this.subscriber.on('message', (channel, message) => {
+            try {
+                const data = JSON.parse(message);
+                this.handleRedisMessage(channel, data);
+            } catch (error) {
+                console.error('Redis message handling error:', error);
+            }
+        });
+    }
+
+    // Handle Redis pub/sub messages for cross-server synchronization
+    handleRedisMessage(channel, data) {
+        switch (channel) {
+            case 'socket:user_joined':
+                this.io.to(data.roomId).emit('user-joined', data.payload);
+                break;
+            case 'socket:user_left':
+                this.io.to(data.roomId).emit('user-left', data.payload);
+                break;
+            case 'socket:message_broadcast':
+                this.io.to(data.roomId).emit(data.event, data.payload);
+                break;
+            case 'socket:meeting_update':
+                this.io.to(data.roomId).emit('meeting-updated', data.payload);
+                break;
+        }
     }
 
     handleConnection(socket) {
         console.log(`User connected: ${socket.id}`);
 
         // Join room
-        socket.on('join-room', (data) => {
+        socket.on('join-room', async (data) => {
             try {
                 const { roomId, userId, userName } = data;
-                const result = roomService.joinRoom(socket.id, roomId, userId, userName);
+
+                // Use meeting cache service for participant management
+                const meeting = await meetingCacheService.getMeeting(roomId);
+                if (!meeting) {
+                    socket.emit('error', { message: 'Meeting not found' });
+                    return;
+                }
+
+                // Add participant to meeting cache
+                const participantData = {
+                    userId,
+                    userName,
+                    socketId: socket.id,
+                    joinedAt: new Date().toISOString(),
+                    isAudioMuted: false,
+                    isVideoMuted: false,
+                    isScreenSharing: false
+                };
+
+                await meetingCacheService.addParticipantToMeeting(roomId, participantData);
+
+                // Get updated participants list
+                const participants = await meetingCacheService.getCachedMeetingParticipants(roomId);
+                const isHost = meeting.hostId === userId;
+
+                const result = {
+                    roomId,
+                    isHost,
+                    participants: participants.map(p => ({
+                        userId: p.userId,
+                        userName: p.userName,
+                        isHost: meeting.hostId === p.userId,
+                        isAudioMuted: p.isAudioMuted,
+                        isVideoMuted: p.isVideoMuted,
+                        isScreenSharing: p.isScreenSharing
+                    }))
+                };
 
                 // Join socket room
                 socket.join(roomId);
 
+                // Store socket-room mapping in Redis
+                await sessionCacheService.setSession(`socket:${socket.id}`, {
+                    roomId,
+                    userId,
+                    userName,
+                    joinedAt: new Date().toISOString()
+                });
+
                 // Notify user they joined successfully
                 socket.emit('joined-room', result);
 
-                // Notify other participants
+                // Publish to Redis for cross-server synchronization
+                await this.publisher.publish('socket:user_joined', JSON.stringify({
+                    roomId,
+                    payload: {
+                        userId,
+                        userName,
+                        isHost,
+                        participants: result.participants
+                    }
+                }));
+
+                // Also emit locally
                 socket.to(roomId).emit('user-joined', {
                     userId,
                     userName,
-                    isHost: result.isHost,
+                    isHost,
                     participants: result.participants
                 });
 

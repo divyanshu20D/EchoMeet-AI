@@ -1,10 +1,18 @@
-const { z } = require('zod');
+import { z } from 'zod';
 
 // Meeting creation schema
 const meetingCreationSchema = z.object({
     title: z.string().min(1, 'Meeting title is required').max(200, 'Title must be less than 200 characters'),
     description: z.string().max(1000, 'Description must be less than 1000 characters').optional(),
-    scheduledAt: z.string().datetime('Invalid date format').optional(),
+    scheduledAt: z.string()
+        .optional()
+        .refine((val) => {
+            if (!val) return true; // Optional field
+            // Accept both datetime-local format (YYYY-MM-DDTHH:mm) and full ISO format
+            const datetimeLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+            const isoDatetimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+            return datetimeLocalRegex.test(val) || isoDatetimeRegex.test(val) || !isNaN(Date.parse(val));
+        }, 'Invalid date format'),
     settings: z.object({
         isPublic: z.boolean().default(false),
         requirePassword: z.boolean().default(false),
@@ -22,7 +30,15 @@ const meetingCreationSchema = z.object({
 const meetingUpdateSchema = z.object({
     title: z.string().min(1, 'Meeting title is required').max(200, 'Title must be less than 200 characters').optional(),
     description: z.string().max(1000, 'Description must be less than 1000 characters').optional(),
-    scheduledAt: z.string().datetime('Invalid date format').optional(),
+    scheduledAt: z.string()
+        .optional()
+        .refine((val) => {
+            if (!val) return true; // Optional field
+            // Accept both datetime-local format (YYYY-MM-DDTHH:mm) and full ISO format
+            const datetimeLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+            const isoDatetimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+            return datetimeLocalRegex.test(val) || isoDatetimeRegex.test(val) || !isNaN(Date.parse(val));
+        }, 'Invalid date format'),
     settings: z.object({
         isPublic: z.boolean().optional(),
         requirePassword: z.boolean().optional(),
@@ -48,7 +64,7 @@ const chatMessageSchema = z.object({
     message: z.string().min(1, 'Message cannot be empty').max(1000, 'Message must be less than 1000 characters')
 });
 
-module.exports = {
+export {
     meetingCreationSchema,
     meetingUpdateSchema,
     joinMeetingSchema,

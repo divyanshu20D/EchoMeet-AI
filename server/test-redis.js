@@ -1,96 +1,92 @@
 require('dotenv').config();
 const { initializeRedis, checkRedisConnection } = require('./src/utils/redis');
-const cacheService = require('./src/services/cacheService');
-const sessionService = require('./src/services/sessionService');
-const presenceService = require('./src/services/presenceService');
+const sessionCacheService = require('./src/services/sessionCacheService');
+const meetingCacheService = require('./src/services/meetingCacheService');
 
-async function testRedisIntegration() {
-    console.log('🔴 Testing Redis Integration...\n');
+async function testRedisConnection() {
+    console.log('🔴 Testing Redis Connection...\n');
 
     try {
         // Initialize Redis
-        console.log('1. Initializing Redis connection...');
         initializeRedis();
 
-        // Test Redis connection
-        console.log('2. Testing Redis connection...');
-        const connectionStatus = await checkRedisConnection();
-        console.log('✅ Redis connection:', connectionStatus.status);
+        // Test basic connection
+        const healthCheck = await checkRedisConnection();
+        console.log('Redis Health Check:', healthCheck);
 
-        // Test basic cache operations
-        console.log('\n3. Testing basic cache operations...');
-        await cacheService.set('test:key', { message: 'Hello Redis!' }, 60);
-        const cachedData = await cacheService.get('test:key');
-        console.log('✅ Cache set/get:', cachedData.message);
+        if (healthCheck.status !== 'connected') {
+            console.error('❌ Redis connection failed!');
+            process.exit(1);
+        }
 
-        // Test session service
-        console.log('\n4. Testing session service...');
-        const testUser = {
-            id: 'test-user-123',
+        console.log('✅ Redis connection successful!\n');
+
+        // Test session cache service
+        console.log('🧪 Testing Session Cache Service...');
+        const testSessionId = 'test_session_123';
+        const testSessionData = {
+            userId: 'user_123',
             email: 'test@example.com',
             name: 'Test User',
-            role: 'USER'
+            role: 'USER',
+            organizationId: 'org_123'
         };
 
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 1);
+        // Set session
+        const setResult = await sessionCacheService.setSession(testSessionId, testSessionData);
+        console.log('Set session result:', setResult);
 
-        await sessionService.createSession(testUser.id, 'test-token-123', expiresAt, testUser);
-        const session = await sessionService.getSession('test-token-123');
-        console.log('✅ Session created and retrieved:', session.userInfo.name);
+        // Get session
+        const getResult = await sessionCacheService.getSession(testSessionId);
+        console.log('Get session result:', getResult);
 
-        // Test presence service
-        console.log('\n5. Testing presence service...');
-        await presenceService.setUserOnline(testUser.id, testUser);
-        const presence = await presenceService.getUserPresence(testUser.id);
-        console.log('✅ User presence set:', presence.status);
+        // Delete session
+        const deleteResult = await sessionCacheService.deleteSession(testSessionId);
+        console.log('Delete session result:', deleteResult);
 
-        // Test meeting presence
-        console.log('\n6. Testing meeting presence...');
-        await presenceService.addUserToMeeting(testUser.id, 'test-meeting-123', 'host');
-        const meetingParticipants = await presenceService.getMeetingParticipants('test-meeting-123');
-        console.log('✅ Meeting participant added:', Object.keys(meetingParticipants).length, 'participants');
+        console.log('✅ Session cache service working!\n');
 
-        // Get statistics
-        console.log('\n7. Getting statistics...');
-        const sessionStats = await sessionService.getSessionStats();
-        const presenceStats = await presenceService.getPresenceStats();
-        console.log('✅ Session stats:', sessionStats);
-        console.log('✅ Presence stats:', presenceStats);
+        // Test meeting cache service
+        console.log('🧪 Testing Meeting Cache Service...');
+        const testMeetingData = {
+            id: 'meeting_123',
+            title: 'Test Meeting',
+            hostId: 'user_123',
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString()
+        };
 
-        // Cleanup test data
-        console.log('\n8. Cleaning up test data...');
-        await cacheService.del('test:key');
-        await sessionService.invalidateSession('test-token-123');
-        await presenceService.setUserOffline(testUser.id);
-        console.log('✅ Test data cleaned up');
+        // Cache meeting
+        const cacheResult = await meetingCacheService.cacheMeeting(testMeetingData);
+        console.log('Cache meeting result:', cacheResult);
 
-        console.log('\n🎉 All Redis integration tests passed!');
-        console.log('\n📊 Redis Integration Summary:');
-        console.log('   ✅ Redis connection established');
-        console.log('   ✅ Basic caching operations working');
-        console.log('   ✅ Session management with Redis');
-        console.log('   ✅ User presence tracking');
-        console.log('   ✅ Meeting participant management');
-        console.log('   ✅ Statistics and monitoring');
+        // Get cached meeting
+        const getCachedResult = await meetingCacheService.getCachedMeeting('meeting_123');
+        console.log('Get cached meeting result:', getCachedResult);
+
+        // Remove from cache
+        const removeResult = await meetingCacheService.removeMeetingFromCache('meeting_123');
+        console.log('Remove meeting result:', removeResult);
+
+        console.log('✅ Meeting cache service working!\n');
+
+        // Test statistics
+        console.log('📊 Getting Cache Statistics...');
+        const sessionStats = await sessionCacheService.getSessionStats();
+        const meetingStats = await meetingCacheService.getMeetingCacheStats();
+
+        console.log('Session Stats:', sessionStats);
+        console.log('Meeting Stats:', meetingStats);
+
+        console.log('\n🎉 All Redis tests passed successfully!');
 
     } catch (error) {
-        console.error('\n❌ Redis integration test failed:');
-        console.error('Error:', error.message);
-
-        console.log('\n🔍 Troubleshooting:');
-        console.log('   1. Make sure Redis server is running');
-        console.log('   2. Check Redis connection settings in .env');
-        console.log('   3. Verify Docker container "meetAI" is running');
-        console.log('   4. Test Redis connection: docker exec meetAI redis-cli ping');
+        console.error('❌ Redis test failed:', error);
+        process.exit(1);
     }
 
     process.exit(0);
 }
 
-// Run tests if this file is executed directly
-if (require.main === module) {
-    testRedisIntegration();
-}
-
-module.exports = { testRedisIntegration };
+// Run the test
+testRedisConnection();

@@ -1,7 +1,7 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { getPrismaClient } = require('./database');
-const sessionService = require('../services/sessionService');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { getPrismaClient } from './database.js';
+import sessionService from '../services/sessionService.js';
 
 // Hash password
 async function hashPassword(password) {
@@ -172,7 +172,7 @@ async function generateTokenPair(user) {
     };
 }
 
-module.exports = {
+export {
     hashPassword,
     verifyPassword,
     generateToken,

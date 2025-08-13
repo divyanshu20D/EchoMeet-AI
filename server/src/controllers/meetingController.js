@@ -1,4 +1,4 @@
-const meetingService = require('../services/meetingService');
+import meetingService from '../services/meetingService.js';
 
 class MeetingController {
     async createMeeting(req, res) {
@@ -23,7 +23,14 @@ class MeetingController {
 
     async getUserMeetings(req, res) {
         try {
-            const result = await meetingService.getUserMeetings(req.user.id, req.query);
+            const pagination = {
+                page: parseInt(req.query.page) || 1,
+                limit: parseInt(req.query.limit) || 10,
+                sortBy: req.query.sortBy || 'createdAt',
+                sortOrder: req.query.sortOrder || 'desc'
+            };
+
+            const result = await meetingService.getUserMeetings(req.user.id, pagination);
 
             res.json(result);
         } catch (error) {
@@ -265,6 +272,189 @@ class MeetingController {
             });
         }
     }
+
+    async getMeetingInfo(req, res) {
+        try {
+            const { meetingId } = req.params;
+            const meetingInfo = await meetingService.getMeetingInfo(meetingId);
+
+            res.json({
+                data: meetingInfo
+            });
+        } catch (error) {
+            console.error('Get meeting info error:', error);
+
+            if (error.message === 'MEETING_NOT_FOUND') {
+                return res.status(404).json({
+                    error: {
+                        code: 'MEETING_NOT_FOUND',
+                        message: 'Meeting not found',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            res.status(500).json({
+                error: {
+                    code: 'MEETING_INFO_FAILED',
+                    message: 'Failed to get meeting information',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
+
+    async validateMeetingAccess(req, res) {
+        try {
+            const { meetingId, password, guestName } = req.body;
+
+            if (!meetingId) {
+                return res.status(400).json({
+                    error: {
+                        code: 'MISSING_MEETING_ID',
+                        message: 'Meeting ID is required',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            const result = await meetingService.validateMeetingAccess(
+                meetingId,
+                password,
+                req.user?.id,
+                guestName
+            );
+
+            res.json({
+                message: 'Access validated successfully',
+                data: result
+            });
+        } catch (error) {
+            console.error('Validate meeting access error:', error);
+
+            if (error.message === 'MEETING_NOT_FOUND') {
+                return res.status(404).json({
+                    error: {
+                        code: 'MEETING_NOT_FOUND',
+                        message: 'Meeting not found',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            if (error.message === 'INVALID_PASSWORD') {
+                return res.status(401).json({
+                    error: {
+                        code: 'INVALID_PASSWORD',
+                        message: 'Invalid meeting password',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            if (error.message === 'MEETING_ENDED') {
+                return res.status(400).json({
+                    error: {
+                        code: 'MEETING_ENDED',
+                        message: 'This meeting has ended',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            res.status(500).json({
+                error: {
+                    code: 'ACCESS_VALIDATION_FAILED',
+                    message: 'Failed to validate meeting access',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
+
+    async joinMeeting(req, res) {
+        try {
+            const { meetingId } = req.params;
+            const result = await meetingService.joinMeeting(meetingId, req.user.id);
+
+            res.json({
+                message: 'Joined meeting successfully',
+                data: result
+            });
+        } catch (error) {
+            console.error('Join meeting error:', error);
+
+            if (error.message === 'MEETING_NOT_FOUND') {
+                return res.status(404).json({
+                    error: {
+                        code: 'MEETING_NOT_FOUND',
+                        message: 'Meeting not found',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            if (error.message === 'MEETING_ENDED') {
+                return res.status(400).json({
+                    error: {
+                        code: 'MEETING_ENDED',
+                        message: 'This meeting has ended',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
+            res.status(500).json({
+                error: {
+                    code: 'JOIN_MEETING_FAILED',
+                    message: 'Failed to join meeting',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
+
+    async leaveMeeting(req, res) {
+        try {
+            const { meetingId } = req.params;
+            await meetingService.leaveMeeting(meetingId, req.user.id);
+
+            res.json({
+                message: 'Left meeting successfully'
+            });
+        } catch (error) {
+            console.error('Leave meeting error:', error);
+
+            res.status(500).json({
+                error: {
+                    code: 'LEAVE_MEETING_FAILED',
+                    message: 'Failed to leave meeting',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
+
+    async getMeetingParticipants(req, res) {
+        try {
+            const { meetingId } = req.params;
+            const participants = await meetingService.getMeetingParticipants(meetingId);
+
+            res.json({
+                participants
+            });
+        } catch (error) {
+            console.error('Get meeting participants error:', error);
+
+            res.status(500).json({
+                error: {
+                    code: 'GET_PARTICIPANTS_FAILED',
+                    message: 'Failed to get meeting participants',
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    }
 }
 
-module.exports = new MeetingController();
+export default new MeetingController();

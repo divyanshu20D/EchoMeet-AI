@@ -30,6 +30,7 @@ model User {
   chatMessages  ChatMessage[]
   userSessions  UserSession[]
   auditLogs     AuditLog[]
+  sentInvitations MeetingInvitation[]
 
   // User preferences (JSON field)
   preferences   Json?
@@ -74,6 +75,7 @@ model Meeting {
   participants   Participant[]
   recordings     Recording[]
   chatMessages   ChatMessage[]
+  invitations    MeetingInvitation[]
 
   // Meeting settings (JSON field)
   settings       Json?
@@ -115,6 +117,28 @@ model Recording {
   meeting     Meeting         @relation(fields: [meetingId], references: [id])
 
   @@map("recordings")
+}
+
+model MeetingInvitation {
+  id              String    @id @default(cuid())
+  meetingId       String
+  inviterUserId   String
+  inviteeEmail    String
+  role            String    @default("participant")
+  customMessage   String?
+  status          String    @default("pending") // pending, accepted, declined, expired
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  meeting         Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  inviter         User      @relation(fields: [inviterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, inviteeEmail])
+  @@map("meeting_invitations")
 }
 
 model ChatMessage {

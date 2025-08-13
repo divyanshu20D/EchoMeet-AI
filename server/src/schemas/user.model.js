@@ -1,11 +1,12 @@
-const { z } = require('zod');
+import { z } from 'zod';
 
 // User registration schema
 const userRegistrationSchema = z.object({
     email: z.string().email('Invalid email format'),
     name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be less than 100 characters'),
     password: z.string().min(8, 'Password must be at least 8 characters').max(128, 'Password must be less than 128 characters'),
-    organizationId: z.string().optional()
+    organizationId: z.string().optional(),
+    organizationName: z.string().min(2, 'Organization name must be at least 2 characters').max(100, 'Organization name must be less than 100 characters').optional()
 });
 
 // User login schema
@@ -38,7 +39,7 @@ const passwordChangeSchema = z.object({
     newPassword: z.string().min(8, 'New password must be at least 8 characters').max(128, 'New password must be less than 128 characters')
 });
 
-module.exports = {
+export {
     userRegistrationSchema,
     userLoginSchema,
     userUpdateSchema,

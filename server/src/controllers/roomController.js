@@ -1,5 +1,4 @@
-const roomService = require('../services/roomService');
-
+import roomService from '../services/roomService.js';
 class RoomController {
     async createRoom(req, res) {
         try {
@@ -78,4 +77,4 @@ class RoomController {
     }
 }
 
-module.exports = new RoomController();
+export default new RoomController();
